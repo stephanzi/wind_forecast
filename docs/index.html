@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Wind Forecast" />
+    <meta name="theme-color" content="#0b3d5c" />
+    <title>Bay Area Wind Forecast</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div>
+        <h1>Bay Area Wind</h1>
+        <p class="subtitle">72-hour forecast · knots · local time</p>
+      </div>
+      <button id="refresh-btn" type="button">Refresh</button>
+    </header>
+
+    <p id="status" class="status" role="status">Loading forecast…</p>
+
+    <main id="forecast-root"></main>
+
+    <footer class="site-footer">
+      <p>
+        Model data from
+        <a href="https://open-meteo.com" target="_blank" rel="noopener"
+          >Open-Meteo</a
+        >. Direction is where wind comes <em>from</em> (0° = north).
+      </p>
+      <p class="legend">
+        Wind colors: 0–30 kt gradient (white → blue → green → orange → red →
+        purple). 30+ kt = deep purple.
+      </p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

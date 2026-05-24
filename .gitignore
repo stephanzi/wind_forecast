@@ -1,0 +1,13 @@
+# Generated forecast snapshots (optional local runs)
+wind_forecast.json
+half_moon_bay_wind_forecast.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
