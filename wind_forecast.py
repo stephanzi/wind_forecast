@@ -30,21 +30,25 @@ WIND_ARROWS = ("↑", "↗", "→", "↘", "↓", "↙", "←", "↖")
 LOCATIONS = (
     {
         "name": "Crissy Field",
+        "short_name": "Crissy",
         "latitude": 37.806662797805316,
         "longitude": -122.45196668011417,
     },
     {
         "name": "Mussel Rock",
+        "short_name": "Mussel",
         "latitude": 37.66726819773798,
         "longitude": -122.49778761412684,
     },
     {
         "name": "Half Moon Bay Inlet",
+        "short_name": "HMB",
         "latitude": 37.0 + 29 / 60 + 35.89 / 3600,
         "longitude": -(122.0 + 29 / 60 + 6.0 / 3600),
     },
     {
         "name": "Waddell Creek",
+        "short_name": "Waddell",
         "latitude": 37.093991877735,
         "longitude": -122.28054683283537,
     },
@@ -216,8 +220,9 @@ def build_row_definitions():
         ("Hour", "hour"),
     ]
     for location in LOCATIONS:
-        rows.append((f"{location['name']} Wind (kts)", "wind_kts"))
-        rows.append((f"{location['name']} Dir", "wind_dir"))
+        short = location["short_name"]
+        rows.append((f"{short} kts", "wind_kts"))
+        rows.append((f"{short} Dir", "wind_dir"))
     return rows
 
 

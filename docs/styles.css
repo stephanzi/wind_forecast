@@ -140,8 +140,8 @@ a {
   font-weight: 600;
   background: var(--card);
   border-right: 1px solid var(--border);
-  min-width: 8.5rem;
-  max-width: 8.5rem;
+  min-width: 4.75rem;
+  max-width: 4.75rem;
   white-space: normal;
   line-height: 1.15;
   font-size: 0.62rem;

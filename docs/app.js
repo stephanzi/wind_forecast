@@ -11,21 +11,25 @@ const WEEKDAY_LABELS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 const LOCATIONS = [
   {
     name: "Crissy Field",
+    shortName: "Crissy",
     latitude: 37.806662797805316,
     longitude: -122.45196668011417,
   },
   {
     name: "Mussel Rock",
+    shortName: "Mussel",
     latitude: 37.66726819773798,
     longitude: -122.49778761412684,
   },
   {
     name: "Half Moon Bay Inlet",
+    shortName: "HMB",
     latitude: 37 + 29 / 60 + 35.89 / 3600,
     longitude: -(122 + 29 / 60 + 6 / 3600),
   },
   {
     name: "Waddell Creek",
+    shortName: "Waddell",
     latitude: 37.093991877735,
     longitude: -122.28054683283537,
   },
@@ -162,7 +166,7 @@ function buildCombinedTableHtml(columns) {
 
   for (let locIndex = 0; locIndex < LOCATIONS.length; locIndex += 1) {
     const location = LOCATIONS[locIndex];
-    html += `<tr><th scope="row" class="row-label">${location.name} Wind (kts)</th>`;
+    html += `<tr><th scope="row" class="row-label">${location.shortName} kts</th>`;
     for (const col of columns) {
       const loc = col.locations[locIndex];
       const rgb = windSpeedRgb(loc.windSpeedRaw);
@@ -172,7 +176,7 @@ function buildCombinedTableHtml(columns) {
     }
     html += "</tr>";
 
-    html += `<tr><th scope="row" class="row-label">${location.name} Dir</th>`;
+    html += `<tr><th scope="row" class="row-label">${location.shortName} Dir</th>`;
     for (const col of columns) {
       const loc = col.locations[locIndex];
       const style = windArrowStyle(loc.windDirectionDegrees);
