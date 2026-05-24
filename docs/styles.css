@@ -181,6 +181,77 @@ a {
   font-weight: 700;
 }
 
+.current-wind-section {
+  padding: 0 0.75rem 1rem;
+}
+
+.section-title {
+  margin: 0.25rem 0 0.35rem;
+  font-size: 1rem;
+  color: var(--accent);
+}
+
+.section-note {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.current-wind-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.5rem 0.65rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  overflow-x: auto;
+}
+
+.current-wind-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.current-wind-table th,
+.current-wind-table td {
+  padding: 0.35rem 0.45rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.current-wind-table thead th {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.current-wind-table tbody tr:last-child th,
+.current-wind-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.current-wind-table tbody th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.current-wind-table td:nth-child(2),
+.current-wind-table th:nth-child(2),
+.current-wind-table td:nth-child(3),
+.current-wind-table th:nth-child(3) {
+  text-align: center;
+  width: 4.5rem;
+}
+
+.wind-cell-inline {
+  display: inline-block;
+  min-width: 2.5rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .site-footer {
   padding: 0.75rem 1rem 1.5rem;
   font-size: 0.78rem;
@@ -198,6 +269,7 @@ a {
 @media (min-width: 768px) {
   .site-header,
   #forecast-root,
+  .current-wind-section,
   .status,
   .site-footer {
     max-width: 1100px;

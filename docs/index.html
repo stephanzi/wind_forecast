@@ -25,12 +25,19 @@
 
     <main id="forecast-root"></main>
 
+    <section class="current-wind-section">
+      <h2 class="section-title">Current Wind Report</h2>
+      <p class="section-note">Live measurements from buoys, airport AWOS, and Mussel Rock PWS.</p>
+      <div id="current-wind-root">Loading observations…</div>
+    </section>
+
     <footer class="site-footer">
       <p>
-        Model data from
+        Forecast from
         <a href="https://open-meteo.com" target="_blank" rel="noopener"
           >Open-Meteo</a
-        >. Direction arrows point where wind is blowing.
+        >. Observations from NOAA NDBC, FAA METAR, and Weather Underground PWS.
+        Direction arrows point where wind is blowing.
       </p>
       <p class="legend">
         Wind colors: 0–30 kt gradient (white → blue → green → orange → red →

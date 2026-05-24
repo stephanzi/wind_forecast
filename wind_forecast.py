@@ -59,6 +59,28 @@ API_URL = "https://api.open-meteo.com/v1/forecast"
 TIMEZONE = "America/Los_Angeles"
 OUTPUT_FILE = Path("wind_forecast.json")
 
+# Live observation sources (measured data, not model forecast)
+METAR_API = "https://aviationweather.gov/api/data/metar"
+NDBC_TXT_URL = "https://www.ndbc.noaa.gov/data/realtime2/{station}.txt"
+WU_PWS_API = "https://api.weather.com/v2/pws/observations/current"
+# Public API key used by the Weather Underground web client (see musselrock.app / mr-weather)
+WU_API_KEY = "e1f10a1e78da46f5b10a1e78da96f525"
+MS_TO_KTS = 1.94384
+MPH_TO_KTS = 0.868976
+
+CURRENT_OBSERVATION_SPOTS = (
+    {"label": "SF West Buoy 46026", "source_type": "ndbc", "station_id": "46026"},
+    {
+        "label": "Mussel Rock",
+        "source_type": "wu_pws",
+        "station_id": "KCADALYC1",
+        "fallback_station_id": "KCADALYC37",
+    },
+    {"label": "HMB Buoy 46012", "source_type": "ndbc", "station_id": "46012"},
+    {"label": "HMB Airport", "source_type": "metar", "station_id": "KHAF"},
+    {"label": "Monterey Bay Buoy 46042", "source_type": "ndbc", "station_id": "46042"},
+)
+
 
 def fetch_wind_forecasts(locations):
     """Fetch hourly wind for all locations in one Open-Meteo request."""
@@ -180,6 +202,160 @@ def format_wind_arrow(degrees_from):
     return WIND_ARROWS[index]
 
 
+def _observation_result(label, wind_kts=None, direction_deg=None, source="", status="ok"):
+    return {
+        "label": label,
+        "wind_kts": format_wind_kts(wind_kts) if wind_kts is not None else "n/a",
+        "wind_speed_knots": wind_kts,
+        "wind_direction_degrees": direction_deg,
+        "wind_arrow": format_wind_arrow(direction_deg),
+        "source": source,
+        "status": status,
+    }
+
+
+def _parse_ndbc_latest(text):
+    """Return (direction_deg, speed_knots) from the newest NDBC .txt row."""
+    for line in text.splitlines():
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) < 7:
+            continue
+        wdir, wspd = parts[5], parts[6]
+        if wdir in ("MM", "999") or wspd in ("MM", "99.0", "999"):
+            return None, None
+        return float(wdir), float(wspd) * MS_TO_KTS
+
+
+def fetch_ndbc_observation(station_id):
+    response = requests.get(
+        NDBC_TXT_URL.format(station=station_id), timeout=20
+    )
+    response.raise_for_status()
+    direction_deg, speed_knots = _parse_ndbc_latest(response.text)
+    if direction_deg is None or speed_knots is None:
+        raise ValueError("No recent wind data")
+    return direction_deg, speed_knots
+
+
+def fetch_metar_observation(station_id):
+    response = requests.get(
+        METAR_API,
+        params={"ids": station_id, "format": "json"},
+        timeout=20,
+    )
+    response.raise_for_status()
+    observations = response.json()
+    if not observations:
+        raise ValueError("No METAR data")
+    obs = observations[0]
+    return obs.get("wdir"), obs.get("wspd")
+
+
+def fetch_wu_pws_observation(station_id, fallback_station_id=None):
+    station_ids = [station_id]
+    if fallback_station_id:
+        station_ids.append(fallback_station_id)
+
+    last_error = None
+    for candidate in station_ids:
+        try:
+            response = requests.get(
+                WU_PWS_API,
+                params={
+                    "stationId": candidate,
+                    "format": "json",
+                    "units": "e",
+                    "apiKey": WU_API_KEY,
+                },
+                timeout=20,
+            )
+            if response.status_code == 204 or not response.text.strip():
+                raise ValueError("Station offline")
+            response.raise_for_status()
+            observations = response.json().get("observations", [])
+            if not observations:
+                raise ValueError("No observations")
+            obs = observations[0]
+            speed_mph = obs["imperial"]["windSpeed"]
+            direction_deg = obs.get("winddir")
+            source = f"Weather Underground PWS {candidate}"
+            return direction_deg, speed_mph * MPH_TO_KTS, source
+        except (KeyError, TypeError, ValueError, requests.RequestException) as error:
+            last_error = error
+            continue
+    raise ValueError(str(last_error) if last_error else "No PWS data")
+
+
+def fetch_current_observations():
+    """Fetch the latest wind reading for each configured observation spot."""
+    results = []
+    for spot in CURRENT_OBSERVATION_SPOTS:
+        label = spot["label"]
+        try:
+            if spot["source_type"] == "ndbc":
+                station_id = spot["station_id"]
+                direction_deg, speed_knots = fetch_ndbc_observation(station_id)
+                source = f"NOAA NDBC buoy {station_id}"
+            elif spot["source_type"] == "metar":
+                station_id = spot["station_id"]
+                direction_deg, speed_knots = fetch_metar_observation(station_id)
+                source = f"FAA AWOS/METAR {station_id}"
+            elif spot["source_type"] == "wu_pws":
+                direction_deg, speed_knots, source = fetch_wu_pws_observation(
+                    spot["station_id"],
+                    spot.get("fallback_station_id"),
+                )
+            else:
+                raise ValueError(f"Unknown source type: {spot['source_type']}")
+
+            results.append(
+                _observation_result(
+                    label,
+                    wind_kts=speed_knots,
+                    direction_deg=direction_deg,
+                    source=source,
+                )
+            )
+        except (ValueError, requests.RequestException) as error:
+            results.append(
+                _observation_result(
+                    label,
+                    source=str(error),
+                    status="error",
+                )
+            )
+    return results
+
+
+def print_current_wind_report(observations):
+    """Print a simple 3-column table of live observations."""
+    print(f"\n{'=' * 72}")
+    print("Current Wind Report (live measurements)")
+    print()
+
+    name_width = max(len(obs["label"]) for obs in observations)
+    name_width = max(name_width, len("Location"))
+
+    print(f"{'Location'.ljust(name_width)}  {'Wind (kts)':>10}  {'Dir':>4}")
+    print(f"{'-' * name_width}  {'-' * 10}  {'-' * 4}")
+
+    for obs in observations:
+        speed_text = obs["wind_kts"]
+        if obs.get("wind_speed_knots") is not None:
+            speed_text = colorize_text(
+                speed_text.rjust(10),
+                wind_speed_rgb(obs["wind_speed_knots"]),
+            )
+        else:
+            speed_text = speed_text.rjust(10)
+
+        print(
+            f"{obs['label'].ljust(name_width)}  {speed_text}  {obs['wind_arrow']:>4}"
+        )
+
+
 def build_combined_columns(location_records_list):
     """
     One column per hour. Shared date/hour; each location adds wind + arrow rows.
@@ -293,7 +469,7 @@ def build_location_payload(location, api_data, records):
     }
 
 
-def save_to_json(location_payloads, combined_rows):
+def save_to_json(location_payloads, combined_rows, current_observations):
     output = {
         "units": {
             "wind_speed": "knots",
@@ -303,6 +479,7 @@ def save_to_json(location_payloads, combined_rows):
         "timezone": TIMEZONE,
         "hours_per_location": HOURS_TO_SHOW,
         "combined_table": {"rows": combined_rows},
+        "current_observations": current_observations,
         "locations": location_payloads,
     }
     OUTPUT_FILE.write_text(json.dumps(output, indent=2), encoding="utf-8")
@@ -389,10 +566,16 @@ def main():
 
     print_combined_forecast_table(all_records)
 
+    print("Fetching live observations...")
+    current_observations = fetch_current_observations()
+    print_current_wind_report(current_observations)
+
     columns = build_combined_columns(all_records)
     row_defs = build_row_definitions()
     combined_rows = build_combined_table_rows(columns, row_defs)
-    saved_path = save_to_json(location_payloads, combined_rows)
+    saved_path = save_to_json(
+        location_payloads, combined_rows, current_observations
+    )
     print(f"\nSaved {len(LOCATIONS)} locations to: {saved_path.resolve()}")
 
 

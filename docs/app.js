@@ -49,7 +49,28 @@ const PURPLE_ABOVE_MAX = [75, 0, 130];
 
 const statusEl = document.getElementById("status");
 const rootEl = document.getElementById("forecast-root");
+const currentWindRootEl = document.getElementById("current-wind-root");
 const refreshBtn = document.getElementById("refresh-btn");
+
+const METAR_API = "https://aviationweather.gov/api/data/metar";
+const NDBC_TXT_URL = "https://www.ndbc.noaa.gov/data/realtime2/{station}.txt";
+const WU_PWS_API = "https://api.weather.com/v2/pws/observations/current";
+const WU_API_KEY = "e1f10a1e78da46f5b10a1e78da96f525";
+const MS_TO_KTS = 1.94384;
+const MPH_TO_KTS = 0.868976;
+
+const CURRENT_OBSERVATION_SPOTS = [
+  { label: "SF West Buoy 46026", sourceType: "ndbc", stationId: "46026" },
+  {
+    label: "Mussel Rock",
+    sourceType: "wu_pws",
+    stationId: "KCADALYC1",
+    fallbackStationId: "KCADALYC37",
+  },
+  { label: "HMB Buoy 46012", sourceType: "ndbc", stationId: "46012" },
+  { label: "HMB Airport", sourceType: "metar", stationId: "KHAF" },
+  { label: "Monterey Bay Buoy 46042", sourceType: "ndbc", stationId: "46042" },
+];
 
 refreshBtn.addEventListener("click", () => loadForecast());
 
@@ -193,6 +214,182 @@ function buildCombinedTableHtml(columns) {
   return html;
 }
 
+function parseNdbcLatest(text) {
+  for (const line of text.split("\n")) {
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+    const parts = line.split(/\s+/);
+    if (parts.length < 7) {
+      continue;
+    }
+    const wdir = parts[5];
+    const wspd = parts[6];
+    if (wdir === "MM" || wspd === "MM") {
+      return null;
+    }
+    return {
+      directionDegrees: Number(wdir),
+      speedKnots: Number(wspd) * MS_TO_KTS,
+    };
+  }
+  return null;
+}
+
+async function fetchTextWithOptionalProxy(url) {
+  let response = await fetch(url);
+  if (!response.ok) {
+    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+    response = await fetch(proxyUrl);
+  }
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  return response.text();
+}
+
+async function fetchNdbcObservation(stationId) {
+  const text = await fetchTextWithOptionalProxy(
+    NDBC_TXT_URL.replace("{station}", stationId)
+  );
+  const parsed = parseNdbcLatest(text);
+  if (!parsed) {
+    throw new Error("No recent wind data");
+  }
+  return parsed;
+}
+
+async function fetchMetarObservation(stationId) {
+  const response = await fetch(
+    `${METAR_API}?ids=${encodeURIComponent(stationId)}&format=json`
+  );
+  if (!response.ok) {
+    throw new Error(`METAR HTTP ${response.status}`);
+  }
+  const observations = await response.json();
+  if (!observations.length) {
+    throw new Error("No METAR data");
+  }
+  return {
+    directionDegrees: observations[0].wdir,
+    speedKnots: observations[0].wspd,
+  };
+}
+
+async function fetchWuObservation(stationId, fallbackStationId) {
+  const stationIds = [stationId];
+  if (fallbackStationId) {
+    stationIds.push(fallbackStationId);
+  }
+
+  let lastError = null;
+  for (const candidate of stationIds) {
+    try {
+      const params = new URLSearchParams({
+        stationId: candidate,
+        format: "json",
+        units: "e",
+        apiKey: WU_API_KEY,
+      });
+      const response = await fetch(`${WU_PWS_API}?${params.toString()}`);
+      if (response.status === 204) {
+        throw new Error("Station offline");
+      }
+      if (!response.ok) {
+        throw new Error(`PWS HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      const obs = data.observations?.[0];
+      if (!obs) {
+        throw new Error("No observations");
+      }
+      return {
+        directionDegrees: obs.winddir,
+        speedKnots: obs.imperial.windSpeed * MPH_TO_KTS,
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("No PWS data");
+}
+
+async function fetchCurrentObservation(spot) {
+  if (spot.sourceType === "ndbc") {
+    return fetchNdbcObservation(spot.stationId);
+  }
+  if (spot.sourceType === "metar") {
+    return fetchMetarObservation(spot.stationId);
+  }
+  if (spot.sourceType === "wu_pws") {
+    return fetchWuObservation(spot.stationId, spot.fallbackStationId);
+  }
+  throw new Error(`Unknown source: ${spot.sourceType}`);
+}
+
+function buildCurrentWindTableHtml(rows) {
+  let html = `
+    <div class="current-wind-card">
+      <table class="current-wind-table">
+        <thead>
+          <tr>
+            <th scope="col">Location</th>
+            <th scope="col">Wind (kts)</th>
+            <th scope="col">Dir</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  for (const row of rows) {
+    let speedCell = row.windKts;
+    if (row.speedKnots != null) {
+      const rgb = windSpeedRgb(row.speedKnots);
+      const bg = rgbToCss(rgb);
+      const fg = textColorForBackground(rgb);
+      speedCell = `<span class="wind-cell-inline" style="background:${bg};color:${fg}">${row.windKts}</span>`;
+    }
+
+    let dirCell = "·";
+    if (row.directionDegrees != null) {
+      const style = windArrowStyle(row.directionDegrees);
+      dirCell = `<span class="wind-arrow" style="${style}" aria-hidden="true">↑</span>`;
+    }
+
+    html += `<tr><th scope="row">${row.label}</th><td>${speedCell}</td><td class="dir-cell">${dirCell}</td></tr>`;
+  }
+
+  html += "</tbody></table></div>";
+  return html;
+}
+
+async function loadCurrentWindReport() {
+  currentWindRootEl.textContent = "Loading observations…";
+
+  const rows = await Promise.all(
+    CURRENT_OBSERVATION_SPOTS.map(async (spot) => {
+      try {
+        const obs = await fetchCurrentObservation(spot);
+        return {
+          label: spot.label,
+          windKts: obs.speedKnots.toFixed(1),
+          speedKnots: obs.speedKnots,
+          directionDegrees: obs.directionDegrees,
+        };
+      } catch (error) {
+        return {
+          label: spot.label,
+          windKts: "n/a",
+          speedKnots: null,
+          directionDegrees: null,
+        };
+      }
+    })
+  );
+
+  currentWindRootEl.innerHTML = buildCurrentWindTableHtml(rows);
+}
+
 async function fetchForecasts() {
   const params = new URLSearchParams({
     latitude: LOCATIONS.map((loc) => loc.latitude).join(","),
@@ -219,7 +416,12 @@ function setStatus(message, isError = false) {
 
 async function loadForecast() {
   refreshBtn.disabled = true;
-  setStatus("Loading forecast…");
+  setStatus("Loading forecast and observations…");
+
+  const observationsPromise = loadCurrentWindReport().catch((error) => {
+    console.error(error);
+    currentWindRootEl.textContent = "Could not load observations.";
+  });
 
   try {
     const apiResults = await fetchForecasts();
@@ -243,6 +445,7 @@ async function loadForecast() {
     rootEl.innerHTML = "";
     setStatus(`Could not load forecast: ${error.message}`, true);
   } finally {
+    await observationsPromise;
     refreshBtn.disabled = false;
   }
 }
