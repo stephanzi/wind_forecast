@@ -50,6 +50,7 @@ const PURPLE_ABOVE_MAX = [75, 0, 130];
 const statusEl = document.getElementById("status");
 const rootEl = document.getElementById("forecast-root");
 const currentWindRootEl = document.getElementById("current-wind-root");
+const satelliteLoopRootEl = document.getElementById("satellite-loop-root");
 const refreshBtn = document.getElementById("refresh-btn");
 
 const NWS_OBSERVATIONS_URL =
@@ -61,6 +62,13 @@ const KMH_TO_KTS = 0.539957;
 const MPH_TO_KTS = 0.868976;
 
 let cachedNdbcObservations = null;
+let satelliteAnimationTimer = null;
+
+const NOAA_GEOCOLOR_CATALOG =
+  "https://cdn.star.nesdis.noaa.gov/WFO/catalogs/WFO_GEOCOLOR_mtr_catalog.json";
+const NOAA_GEOCOLOR_BASE = "https://cdn.star.nesdis.noaa.gov/WFO/mtr/GEOCOLOR/";
+const SATELLITE_LOOP_FRAMES = 12;
+const SATELLITE_FRAME_MS = 300;
 
 const CURRENT_OBSERVATION_SPOTS = [
   { label: "SF West Buoy 46026", sourceType: "ndbc", stationId: "46026" },
@@ -381,6 +389,111 @@ async function loadCurrentWindReport() {
   currentWindRootEl.innerHTML = buildCurrentWindTableHtml(rows);
 }
 
+function parseNoaaImageTime(filename) {
+  const match = filename.match(/^(\d{4})(\d{3})(\d{2})(\d{2})/);
+  if (!match) {
+    return null;
+  }
+  const year = Number(match[1]);
+  const dayOfYear = Number(match[2]);
+  const hour = Number(match[3]);
+  const minute = Number(match[4]);
+  const observedAt = new Date(Date.UTC(year, 0, 1, hour, minute));
+  observedAt.setUTCDate(dayOfYear);
+  return observedAt;
+}
+
+function formatSatelliteTimestamp(observedAt) {
+  if (!observedAt) {
+    return "";
+  }
+  return observedAt.toLocaleString("en-US", {
+    timeZone: TIMEZONE,
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+async function fetchSatelliteLoopFrames() {
+  const response = await fetch(NOAA_GEOCOLOR_CATALOG);
+  if (!response.ok) {
+    throw new Error(`Satellite catalog HTTP ${response.status}`);
+  }
+  const catalog = await response.json();
+  const filenames = catalog.images?.["600x600"]?.slice(-SATELLITE_LOOP_FRAMES);
+  if (!filenames?.length) {
+    throw new Error("No satellite frames available");
+  }
+  return filenames.map((filename) => ({
+    url: `${NOAA_GEOCOLOR_BASE}${filename}`,
+    filename,
+    observedAt: parseNoaaImageTime(filename),
+  }));
+}
+
+function preloadImage(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error(`Could not load ${url}`));
+    image.src = url;
+  });
+}
+
+function stopSatelliteLoop() {
+  if (satelliteAnimationTimer != null) {
+    clearInterval(satelliteAnimationTimer);
+    satelliteAnimationTimer = null;
+  }
+}
+
+function startSatelliteLoop(frames, imageEl, timestampEl) {
+  stopSatelliteLoop();
+  let frameIndex = 0;
+
+  function showFrame(index) {
+    const frame = frames[index];
+    imageEl.src = frame.url;
+    timestampEl.textContent = formatSatelliteTimestamp(frame.observedAt);
+  }
+
+  showFrame(frameIndex);
+  satelliteAnimationTimer = setInterval(() => {
+    frameIndex = (frameIndex + 1) % frames.length;
+    showFrame(frameIndex);
+  }, SATELLITE_FRAME_MS);
+}
+
+async function loadSatelliteLoop() {
+  satelliteLoopRootEl.textContent = "Loading satellite loop…";
+  stopSatelliteLoop();
+
+  try {
+    const frames = await fetchSatelliteLoopFrames();
+    await Promise.all(frames.map((frame) => preloadImage(frame.url)));
+
+    satelliteLoopRootEl.innerHTML = `
+      <div class="satellite-loop-card">
+        <div class="satellite-loop-frame">
+          <img id="satellite-loop-image" alt="Bay Area GOES GeoColor satellite imagery" />
+        </div>
+        <div id="satellite-loop-timestamp" class="satellite-loop-timestamp"></div>
+      </div>
+    `;
+
+    startSatelliteLoop(
+      frames,
+      document.getElementById("satellite-loop-image"),
+      document.getElementById("satellite-loop-timestamp")
+    );
+  } catch (error) {
+    console.error(error);
+    satelliteLoopRootEl.textContent = "Could not load satellite loop.";
+  }
+}
+
 async function fetchForecasts() {
   const params = new URLSearchParams({
     latitude: LOCATIONS.map((loc) => loc.latitude).join(","),
@@ -408,11 +521,17 @@ function setStatus(message, isError = false) {
 async function loadForecast() {
   refreshBtn.disabled = true;
   cachedNdbcObservations = null;
+  stopSatelliteLoop();
   setStatus("Loading forecast and observations…");
 
   const observationsPromise = loadCurrentWindReport().catch((error) => {
     console.error(error);
     currentWindRootEl.textContent = "Could not load observations.";
+  });
+
+  const satellitePromise = loadSatelliteLoop().catch((error) => {
+    console.error(error);
+    satelliteLoopRootEl.textContent = "Could not load satellite loop.";
   });
 
   try {
@@ -437,7 +556,7 @@ async function loadForecast() {
     rootEl.innerHTML = "";
     setStatus(`Could not load forecast: ${error.message}`, true);
   } finally {
-    await observationsPromise;
+    await Promise.all([observationsPromise, satellitePromise]);
     refreshBtn.disabled = false;
   }
 }
