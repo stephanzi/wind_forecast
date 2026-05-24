@@ -52,12 +52,15 @@ const rootEl = document.getElementById("forecast-root");
 const currentWindRootEl = document.getElementById("current-wind-root");
 const refreshBtn = document.getElementById("refresh-btn");
 
-const METAR_API = "https://aviationweather.gov/api/data/metar";
-const NDBC_TXT_URL = "https://www.ndbc.noaa.gov/data/realtime2/{station}.txt";
+const NWS_OBSERVATIONS_URL =
+  "https://api.weather.gov/stations/{station}/observations/latest";
+const CURRENT_OBSERVATIONS_URL = "current_observations.json";
 const WU_PWS_API = "https://api.weather.com/v2/pws/observations/current";
 const WU_API_KEY = "e1f10a1e78da46f5b10a1e78da96f525";
-const MS_TO_KTS = 1.94384;
+const KMH_TO_KTS = 0.539957;
 const MPH_TO_KTS = 0.868976;
+
+let cachedNdbcObservations = null;
 
 const CURRENT_OBSERVATION_SPOTS = [
   { label: "SF West Buoy 46026", sourceType: "ndbc", stationId: "46026" },
@@ -214,65 +217,53 @@ function buildCombinedTableHtml(columns) {
   return html;
 }
 
-function parseNdbcLatest(text) {
-  for (const line of text.split("\n")) {
-    if (!line || line.startsWith("#")) {
-      continue;
-    }
-    const parts = line.split(/\s+/);
-    if (parts.length < 7) {
-      continue;
-    }
-    const wdir = parts[5];
-    const wspd = parts[6];
-    if (wdir === "MM" || wspd === "MM") {
-      return null;
-    }
-    return {
-      directionDegrees: Number(wdir),
-      speedKnots: Number(wspd) * MS_TO_KTS,
-    };
+async function loadNdbcObservationsCache() {
+  if (cachedNdbcObservations) {
+    return cachedNdbcObservations;
   }
-  return null;
-}
-
-async function fetchTextWithOptionalProxy(url) {
-  let response = await fetch(url);
+  const response = await fetch(CURRENT_OBSERVATIONS_URL);
   if (!response.ok) {
-    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-    response = await fetch(proxyUrl);
+    throw new Error(`Observations cache HTTP ${response.status}`);
   }
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
-  return response.text();
+  cachedNdbcObservations = await response.json();
+  return cachedNdbcObservations;
 }
 
 async function fetchNdbcObservation(stationId) {
-  const text = await fetchTextWithOptionalProxy(
-    NDBC_TXT_URL.replace("{station}", stationId)
-  );
-  const parsed = parseNdbcLatest(text);
-  if (!parsed) {
-    throw new Error("No recent wind data");
+  const cache = await loadNdbcObservationsCache();
+  const station = cache.stations?.[stationId];
+  if (!station || station.error) {
+    throw new Error(station?.error || "No buoy data");
   }
-  return parsed;
+  return {
+    directionDegrees: station.direction_degrees,
+    speedKnots: station.speed_knots,
+  };
 }
 
 async function fetchMetarObservation(stationId) {
   const response = await fetch(
-    `${METAR_API}?ids=${encodeURIComponent(stationId)}&format=json`
+    NWS_OBSERVATIONS_URL.replace("{station}", encodeURIComponent(stationId)),
+    { headers: { Accept: "application/geo+json" } }
   );
   if (!response.ok) {
     throw new Error(`METAR HTTP ${response.status}`);
   }
-  const observations = await response.json();
-  if (!observations.length) {
+  const data = await response.json();
+  const properties = data.properties;
+  if (!properties) {
     throw new Error("No METAR data");
   }
+
+  const speedKmh = properties.windSpeed?.value;
+  const directionDegrees = properties.windDirection?.value;
+  if (speedKmh == null || directionDegrees == null) {
+    throw new Error("Wind not reported");
+  }
+
   return {
-    directionDegrees: observations[0].wdir,
-    speedKnots: observations[0].wspd,
+    directionDegrees,
+    speedKnots: speedKmh * KMH_TO_KTS,
   };
 }
 
@@ -416,6 +407,7 @@ function setStatus(message, isError = false) {
 
 async function loadForecast() {
   refreshBtn.disabled = true;
+  cachedNdbcObservations = null;
   setStatus("Loading forecast and observations…");
 
   const observationsPromise = loadCurrentWindReport().catch((error) => {
