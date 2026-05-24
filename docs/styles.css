@@ -94,29 +94,14 @@ a {
 
 #forecast-root {
   padding: 0 0.75rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
 }
 
-.location-card {
+.forecast-card {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 0.85rem 0.85rem 1rem;
+  padding: 0.65rem 0.65rem 0.75rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-.location-card h2 {
-  margin: 0 0 0.35rem;
-  font-size: 1.1rem;
-  color: var(--accent);
-}
-
-.grid-note {
-  margin: 0 0 0.65rem;
-  font-size: 0.75rem;
-  color: var(--muted);
 }
 
 .table-scroll {
@@ -128,7 +113,7 @@ a {
 
 .forecast-table {
   border-collapse: collapse;
-  font-size: 0.78rem;
+  font-size: 0.68rem;
   white-space: nowrap;
   width: max-content;
   min-width: 100%;
@@ -136,9 +121,10 @@ a {
 
 .forecast-table th,
 .forecast-table td {
-  padding: 0.35rem 0.45rem;
-  text-align: right;
+  padding: 0.12rem 0.22rem;
+  text-align: center;
   border-bottom: 1px solid var(--border);
+  min-width: 1.85rem;
 }
 
 .forecast-table tr:last-child th,
@@ -154,12 +140,45 @@ a {
   font-weight: 600;
   background: var(--card);
   border-right: 1px solid var(--border);
-  min-width: 5.5rem;
+  min-width: 8.5rem;
+  max-width: 8.5rem;
+  white-space: normal;
+  line-height: 1.15;
+  font-size: 0.62rem;
+  padding-right: 0.35rem;
+}
+
+.date-cell {
+  line-height: 1.05;
+  vertical-align: middle;
+}
+
+.date-cell .dow,
+.date-cell .dom {
+  display: block;
+  font-size: 0.62rem;
+}
+
+.hour-cell {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.62rem;
 }
 
 .forecast-table .wind-cell {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  font-size: 0.62rem;
+}
+
+.dir-cell {
+  padding: 0.05rem 0.15rem;
+}
+
+.wind-arrow {
+  display: inline-block;
+  font-size: 0.85rem;
+  line-height: 1;
+  font-weight: 700;
 }
 
 .site-footer {

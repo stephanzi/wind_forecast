@@ -1,5 +1,5 @@
 /**
- * Bay Area wind forecast — fetches 72 hours from Open-Meteo for four spots.
+ * Bay Area wind forecast — combined 72-hour table for four spots.
  */
 
 const HOURS_TO_SHOW = 72;
@@ -31,7 +31,6 @@ const LOCATIONS = [
   },
 ];
 
-// Wind speed (knots) -> RGB; smooth blend 0–30 kt, purple above 30
 const WIND_COLOR_STOPS = [
   [0, [255, 255, 255]],
   [3, [173, 216, 230]],
@@ -43,13 +42,6 @@ const WIND_COLOR_STOPS = [
 ];
 const MAX_GRADIENT_KTS = 30;
 const PURPLE_ABOVE_MAX = [75, 0, 130];
-
-const TABLE_ROWS = [
-  { label: "Date", key: "date" },
-  { label: "Hour", key: "hour" },
-  { label: "Wind (kts)", key: "windKts", colorize: true },
-  { label: "Dir (deg)", key: "windDir" },
-];
 
 const statusEl = document.getElementById("status");
 const rootEl = document.getElementById("forecast-root");
@@ -69,7 +61,6 @@ function windSpeedRgb(speedKnots) {
   if (speedKnots == null || Number.isNaN(speedKnots)) {
     return [128, 128, 128];
   }
-
   const speed = Number(speedKnots);
   if (speed >= MAX_GRADIENT_KTS) {
     return PURPLE_ABOVE_MAX;
@@ -77,7 +68,6 @@ function windSpeedRgb(speedKnots) {
   if (speed <= 0) {
     return WIND_COLOR_STOPS[0][1];
   }
-
   for (let index = 0; index < WIND_COLOR_STOPS.length - 1; index += 1) {
     const [speedLow, colorLow] = WIND_COLOR_STOPS[index];
     const [speedHigh, colorHigh] = WIND_COLOR_STOPS[index + 1];
@@ -89,7 +79,6 @@ function windSpeedRgb(speedKnots) {
       return lerpRgb(colorLow, colorHigh, fraction);
     }
   }
-
   return PURPLE_ABOVE_MAX;
 }
 
@@ -102,23 +91,30 @@ function textColorForBackground([r, g, b]) {
   return luminance > 160 ? "#111" : "#fff";
 }
 
-function formatDateLabel(timeStr) {
+function formatDateParts(timeStr) {
   const [datePart] = timeStr.split("T");
   const [year, month, day] = datePart.split("-").map(Number);
   const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
   const dayIndex = date.getUTCDay();
   const weekday = WEEKDAY_LABELS[dayIndex === 0 ? 6 : dayIndex - 1];
-  return `${weekday} ${month}/${day}`;
+  return { weekday, monthDay: `${month}/${day}` };
 }
 
 function formatHourLabel(timeStr) {
-  return timeStr.split("T")[1];
+  return timeStr.split("T")[1].slice(0, 2);
+}
+
+function windArrowStyle(degreesFrom) {
+  if (degreesFrom == null || Number.isNaN(degreesFrom)) {
+    return null;
+  }
+  const toDeg = (Number(degreesFrom) + 180) % 360;
+  return `transform: rotate(${toDeg}deg)`;
 }
 
 function buildRecords(apiData) {
   const hourly = apiData.hourly;
   const records = [];
-
   for (let index = 0; index < hourly.time.length && index < HOURS_TO_SHOW; index += 1) {
     records.push({
       time: hourly.time[index],
@@ -126,65 +122,71 @@ function buildRecords(apiData) {
       windDirectionDegrees: hourly.wind_direction_10m[index],
     });
   }
-
   return records;
 }
 
-function buildColumns(records) {
-  return records.map((record) => ({
-    date: formatDateLabel(record.time),
-    hour: formatHourLabel(record.time),
-    windKts:
-      record.windSpeedKnots == null ? "n/a" : record.windSpeedKnots.toFixed(1),
-    windDir:
-      record.windDirectionDegrees == null
-        ? "n/a"
-        : String(Math.round(record.windDirectionDegrees)),
-    windSpeedRaw: record.windSpeedKnots,
-  }));
+function buildCombinedColumns(allRecords) {
+  const baseRecords = allRecords[0];
+  return baseRecords.map((baseRecord, hourIndex) => {
+    const { weekday, monthDay } = formatDateParts(baseRecord.time);
+    return {
+      weekday,
+      monthDay,
+      hour: formatHourLabel(baseRecord.time),
+      locations: allRecords.map((records) => ({
+        windKts:
+          records[hourIndex].windSpeedKnots == null
+            ? "n/a"
+            : records[hourIndex].windSpeedKnots.toFixed(1),
+        windSpeedRaw: records[hourIndex].windSpeedKnots,
+        windDirectionDegrees: records[hourIndex].windDirectionDegrees,
+      })),
+    };
+  });
 }
 
-function buildTableHtml(columns) {
-  const colCount = columns.length;
+function buildCombinedTableHtml(columns) {
   let html = '<div class="table-scroll"><table class="forecast-table">';
 
-  for (const row of TABLE_ROWS) {
-    html += "<tr>";
-    html += `<th scope="row" class="row-label">${row.label}</th>`;
+  html += '<tr><th scope="row" class="row-label">Date</th>';
+  for (const col of columns) {
+    html += `<td class="date-cell"><span class="dow">${col.weekday}</span><span class="dom">${col.monthDay}</span></td>`;
+  }
+  html += "</tr>";
 
-    for (let index = 0; index < colCount; index += 1) {
-      const value = columns[index][row.key];
-      if (row.colorize) {
-        const rgb = windSpeedRgb(columns[index].windSpeedRaw);
-        const bg = rgbToCss(rgb);
-        const fg = textColorForBackground(rgb);
-        html += `<td class="wind-cell" style="background:${bg};color:${fg}">${value}</td>`;
+  html += '<tr><th scope="row" class="row-label">Hour</th>';
+  for (const col of columns) {
+    html += `<td class="hour-cell">${col.hour}</td>`;
+  }
+  html += "</tr>";
+
+  for (let locIndex = 0; locIndex < LOCATIONS.length; locIndex += 1) {
+    const location = LOCATIONS[locIndex];
+    html += `<tr><th scope="row" class="row-label">${location.name} Wind (kts)</th>`;
+    for (const col of columns) {
+      const loc = col.locations[locIndex];
+      const rgb = windSpeedRgb(loc.windSpeedRaw);
+      const bg = rgbToCss(rgb);
+      const fg = textColorForBackground(rgb);
+      html += `<td class="wind-cell" style="background:${bg};color:${fg}">${loc.windKts}</td>`;
+    }
+    html += "</tr>";
+
+    html += `<tr><th scope="row" class="row-label">${location.name} Dir</th>`;
+    for (const col of columns) {
+      const loc = col.locations[locIndex];
+      const style = windArrowStyle(loc.windDirectionDegrees);
+      if (style) {
+        html += `<td class="dir-cell"><span class="wind-arrow" style="${style}" aria-hidden="true">↑</span></td>`;
       } else {
-        html += `<td>${value}</td>`;
+        html += '<td class="dir-cell">·</td>';
       }
     }
-
     html += "</tr>";
   }
 
   html += "</table></div>";
   return html;
-}
-
-function renderLocation(location, apiData, records) {
-  const columns = buildColumns(records);
-  const gridNote =
-    apiData.latitude != null && apiData.longitude != null
-      ? `<p class="grid-note">Model grid: ${apiData.latitude.toFixed(4)}, ${apiData.longitude.toFixed(4)}</p>`
-      : "";
-
-  return `
-    <section class="location-card">
-      <h2>${location.name}</h2>
-      ${gridNote}
-      ${buildTableHtml(columns)}
-    </section>
-  `;
 }
 
 async function fetchForecasts() {
@@ -217,19 +219,19 @@ async function loadForecast() {
 
   try {
     const apiResults = await fetchForecasts();
+    const allRecords = LOCATIONS.map((_loc, index) => buildRecords(apiResults[index]));
+    const columns = buildCombinedColumns(allRecords);
     const updatedAt = new Date().toLocaleString("en-US", {
       timeZone: TIMEZONE,
       dateStyle: "medium",
       timeStyle: "short",
     });
 
-    rootEl.innerHTML = LOCATIONS.map((location, index) =>
-      renderLocation(
-        location,
-        apiResults[index],
-        buildRecords(apiResults[index])
-      )
-    ).join("");
+    rootEl.innerHTML = `
+      <section class="forecast-card">
+        ${buildCombinedTableHtml(columns)}
+      </section>
+    `;
 
     setStatus(`Updated ${updatedAt} (${TIMEZONE})`);
   } catch (error) {
