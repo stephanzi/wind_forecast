@@ -1,5 +1,5 @@
 """
-Bay Area kite/wind forecast — 72-hour combined table for four spots.
+Bay Area kite/wind forecast — 10-day combined table for four spots.
 Fetches from Open-Meteo (free, no API key) and saves JSON output.
 """
 
@@ -54,7 +54,8 @@ LOCATIONS = (
     },
 )
 
-HOURS_TO_SHOW = 72
+FORECAST_DAYS = 10
+HOURS_TO_SHOW = FORECAST_DAYS * 24
 API_URL = "https://api.open-meteo.com/v1/forecast"
 TIMEZONE = "America/Los_Angeles"
 OUTPUT_FILE = Path("wind_forecast.json")
@@ -89,7 +90,7 @@ def fetch_wind_forecasts(locations):
         "longitude": ",".join(str(loc["longitude"]) for loc in locations),
         "hourly": "wind_speed_10m,wind_direction_10m",
         "wind_speed_unit": "kn",
-        "forecast_days": 3,
+        "forecast_days": FORECAST_DAYS,
         "timezone": TIMEZONE,
     }
     response = requests.get(API_URL, params=params, timeout=30)
@@ -99,7 +100,7 @@ def fetch_wind_forecasts(locations):
 
 
 def build_forecast_records(api_data):
-    """Build up to 72 hourly records from one API response."""
+    """Build hourly records from one API response (up to FORECAST_DAYS)."""
     hourly = api_data["hourly"]
     records = []
     for time_str, speed_knots, direction_deg in zip(

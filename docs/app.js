@@ -1,8 +1,9 @@
 /**
- * Bay Area wind forecast — combined 72-hour table for four spots.
+ * Bay Area wind forecast — combined 10-day table for four spots.
  */
 
-const HOURS_TO_SHOW = 72;
+const FORECAST_DAYS = 10;
+const HOURS_TO_SHOW = FORECAST_DAYS * 24;
 const TIMEZONE = "America/Los_Angeles";
 const API_URL = "https://api.open-meteo.com/v1/forecast";
 
@@ -500,7 +501,7 @@ async function fetchForecasts() {
     longitude: LOCATIONS.map((loc) => loc.longitude).join(","),
     hourly: "wind_speed_10m,wind_direction_10m",
     wind_speed_unit: "kn",
-    forecast_days: "3",
+    forecast_days: String(FORECAST_DAYS),
     timezone: TIMEZONE,
   });
 
