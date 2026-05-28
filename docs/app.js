@@ -41,12 +41,12 @@ const WIND_COLOR_STOPS = [
   [3, [173, 216, 230]],
   [8, [60, 179, 113]],
   [12, [255, 165, 0]],
-  [18, [139, 0, 0]],
-  [26, [128, 0, 128]],
-  [30, [75, 0, 130]],
+  [15, [255, 0, 0]],
+  [22, [255, 45, 45]],
+  [30, [255, 0, 0]],
 ];
 const MAX_GRADIENT_KTS = 30;
-const PURPLE_ABOVE_MAX = [75, 0, 130];
+const PURPLE_ABOVE_MAX = [255, 0, 0];
 
 const statusEl = document.getElementById("status");
 const rootEl = document.getElementById("forecast-root");

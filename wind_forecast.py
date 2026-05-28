@@ -10,18 +10,18 @@ from pathlib import Path
 
 import requests
 
-# Gradient anchors: wind speed (knots) -> RGB. Smooth blend from 0–30 kts; 30+ stays purple.
+# Gradient anchors: wind speed (knots) -> RGB. Smooth blend from 0–30 kts; 30+ stays bright red.
 WIND_COLOR_STOPS = (
     (0.0, (255, 255, 255)),
     (3.0, (173, 216, 230)),
     (8.0, (60, 179, 113)),
     (12.0, (255, 165, 0)),
-    (18.0, (139, 0, 0)),
-    (26.0, (128, 0, 128)),
-    (30.0, (75, 0, 130)),
+    (15.0, (255, 0, 0)),
+    (22.0, (255, 45, 45)),
+    (30.0, (255, 0, 0)),
 )
 MAX_GRADIENT_KTS = 30.0
-PURPLE_ABOVE_MAX = (75, 0, 130)
+PURPLE_ABOVE_MAX = (255, 0, 0)
 
 WEEKDAY_LABELS = ("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
 # 8-point arrows for direction wind is blowing toward (0° = north)
