@@ -52,6 +52,7 @@ const statusEl = document.getElementById("status");
 const rootEl = document.getElementById("forecast-root");
 const currentWindRootEl = document.getElementById("current-wind-root");
 const satelliteLoopRootEl = document.getElementById("satellite-loop-root");
+const harborCamRootEl = document.getElementById("harbor-cam-root");
 const refreshBtn = document.getElementById("refresh-btn");
 
 const NWS_OBSERVATIONS_URL =
@@ -70,6 +71,11 @@ const NOAA_GEOCOLOR_CATALOG =
 const NOAA_GEOCOLOR_BASE = "https://cdn.star.nesdis.noaa.gov/WFO/mtr/GEOCOLOR/";
 const SATELLITE_LOOP_FRAMES = 12;
 const SATELLITE_FRAME_MS = 300;
+
+const HMBYC_LIVE_URL = "https://www.hmbyc.org/livevideo";
+const HMBYC_CAMERA_ALIAS = "63ea74c6a29d6";
+const HMBYC_SNAPSHOT_BASE =
+  "https://ipcamlive.com/player/snapshot.php?alias=" + HMBYC_CAMERA_ALIAS;
 
 const CURRENT_OBSERVATION_SPOTS = [
   { label: "SF West Buoy 46026", sourceType: "ndbc", stationId: "46026" },
@@ -495,6 +501,22 @@ async function loadSatelliteLoop() {
   }
 }
 
+function loadHarborCam() {
+  const snapshotUrl = `${HMBYC_SNAPSHOT_BASE}&_=${Date.now()}`;
+  harborCamRootEl.innerHTML = `
+    <div class="harbor-cam-card">
+      <a class="harbor-cam-link" href="${HMBYC_LIVE_URL}" target="_blank" rel="noopener">
+        <img
+          src="${snapshotUrl}"
+          alt="Pillar Point Harbor live camera preview from Half Moon Bay Yacht Club"
+          loading="lazy"
+        />
+      </a>
+      <p class="harbor-cam-note">Snapshot updates about every 2 minutes · tap for live video</p>
+    </div>
+  `;
+}
+
 async function fetchForecasts() {
   const params = new URLSearchParams({
     latitude: LOCATIONS.map((loc) => loc.latitude).join(","),
@@ -534,6 +556,8 @@ async function loadForecast() {
     console.error(error);
     satelliteLoopRootEl.textContent = "Could not load satellite loop.";
   });
+
+  loadHarborCam();
 
   try {
     const apiResults = await fetchForecasts();
