@@ -1,17 +1,17 @@
 {
-  "updated_at": "2026-06-01T19:28:42.185300+00:00",
+  "updated_at": "2026-06-02T00:00:17.363890+00:00",
   "source": "NOAA NDBC (https://www.ndbc.noaa.gov)",
   "stations": {
     "46026": {
-      "direction_degrees": 300.0,
-      "speed_knots": 7.77536
+      "direction_degrees": 310.0,
+      "speed_knots": 11.66304
     },
     "46012": {
-      "direction_degrees": 300.0,
-      "speed_knots": 7.77536
+      "direction_degrees": 290.0,
+      "speed_knots": 11.66304
     },
     "46042": {
-      "direction_degrees": 320.0,
+      "direction_degrees": 310.0,
       "speed_knots": 13.60688
     }
   }
