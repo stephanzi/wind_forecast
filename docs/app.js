@@ -3,7 +3,9 @@
  */
 
 const FORECAST_DAYS = 10;
-const HOURS_TO_SHOW = FORECAST_DAYS * 24;
+const FORECAST_HOURS = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21];
+const FORECAST_HOUR_SET = new Set(FORECAST_HOURS);
+const HOURS_TO_SHOW = FORECAST_DAYS * FORECAST_HOURS.length;
 const TIMEZONE = "America/Los_Angeles";
 const API_URL = "https://api.open-meteo.com/v1/forecast";
 
@@ -155,15 +157,26 @@ function windArrowStyle(degreesFrom) {
   return `transform: rotate(${toDeg}deg)`;
 }
 
+function isForecastHour(timeStr) {
+  return FORECAST_HOUR_SET.has(Number(timeStr.split("T")[1].slice(0, 2)));
+}
+
 function buildRecords(apiData) {
   const hourly = apiData.hourly;
   const records = [];
-  for (let index = 0; index < hourly.time.length && index < HOURS_TO_SHOW; index += 1) {
+  for (let index = 0; index < hourly.time.length; index += 1) {
+    const time = hourly.time[index];
+    if (!isForecastHour(time)) {
+      continue;
+    }
     records.push({
-      time: hourly.time[index],
+      time,
       windSpeedKnots: hourly.wind_speed_10m[index],
       windDirectionDegrees: hourly.wind_direction_10m[index],
     });
+    if (records.length >= HOURS_TO_SHOW) {
+      break;
+    }
   }
   return records;
 }
