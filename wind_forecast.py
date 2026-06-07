@@ -55,7 +55,8 @@ LOCATIONS = (
 )
 
 FORECAST_DAYS = 10
-HOURS_TO_SHOW = FORECAST_DAYS * 24
+FORECAST_HOURS = (3, 5, 7, 9, 11, 13, 15, 17, 19, 21)
+HOURS_TO_SHOW = FORECAST_DAYS * len(FORECAST_HOURS)
 API_URL = "https://api.open-meteo.com/v1/forecast"
 TIMEZONE = "America/Los_Angeles"
 OUTPUT_FILE = Path("wind_forecast.json")
@@ -100,14 +101,18 @@ def fetch_wind_forecasts(locations):
 
 
 def build_forecast_records(api_data):
-    """Build hourly records from one API response (up to FORECAST_DAYS)."""
+    """Build records for kite-surfing hours only (up to FORECAST_DAYS)."""
     hourly = api_data["hourly"]
+    forecast_hours = set(FORECAST_HOURS)
     records = []
     for time_str, speed_knots, direction_deg in zip(
         hourly["time"],
         hourly["wind_speed_10m"],
         hourly["wind_direction_10m"],
     ):
+        hour = int(time_str.split("T")[1][:2])
+        if hour not in forecast_hours:
+            continue
         records.append(
             {
                 "time": time_str,
