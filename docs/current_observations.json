@@ -1,14 +1,14 @@
 {
-  "updated_at": "2026-06-25T06:34:45.926154+00:00",
+  "updated_at": "2026-06-25T09:57:30.245814+00:00",
   "source": "NOAA NDBC (https://www.ndbc.noaa.gov)",
   "stations": {
     "46026": {
-      "direction_degrees": 290.0,
-      "speed_knots": 9.7192
+      "direction_degrees": 260.0,
+      "speed_knots": 3.88768
     },
     "46012": {
-      "direction_degrees": 280.0,
-      "speed_knots": 7.77536
+      "direction_degrees": 270.0,
+      "speed_knots": 5.83152
     },
     "46042": {
       "error": "No recent wind data"
