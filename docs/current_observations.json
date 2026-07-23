@@ -1,18 +1,17 @@
 {
-  "updated_at": "2026-07-23T07:24:34.811589+00:00",
+  "updated_at": "2026-07-23T10:01:06.656982+00:00",
   "source": "NOAA NDBC (https://www.ndbc.noaa.gov)",
   "stations": {
     "46026": {
-      "direction_degrees": 300.0,
-      "speed_knots": 7.77536
+      "direction_degrees": 310.0,
+      "speed_knots": 9.7192
     },
     "46012": {
-      "direction_degrees": 310.0,
-      "speed_knots": 7.77536
+      "error": "('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))"
     },
     "46042": {
       "direction_degrees": 340.0,
-      "speed_knots": 11.66304
+      "speed_knots": 13.60688
     }
   }
 }
